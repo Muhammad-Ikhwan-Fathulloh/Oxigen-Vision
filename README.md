@@ -9,48 +9,61 @@ Hasil klasifikasi label dikirim secara real-time ke topic MQTT saat label beruba
 
 <head>
   <meta charset="UTF-8" />
-  <title>OXIGEN Vision with MQTT Advanced</title>
+  <title>Oxigen Vision</title>
+
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- p5.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.9.0/p5.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.9.0/addons/p5.dom.min.js"></script>
+
+  <!-- ml5.js -->
   <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+
+  <!-- MQTT.js -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
   <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background-color: #222;
-      color: white;
-      font-family: Arial, sans-serif;
-    }
-
     canvas {
-      border: 2px solid white;
-      margin-top: 20px;
-    }
-
-    #status {
-      margin-top: 10px;
-      font-weight: bold;
+      border: 4px solid #0d6efd;
+      border-radius: 10px;
+      margin-bottom: 15px;
     }
 
     #log {
-      width: 80%;
-      height: 200px;
       background-color: #000;
       color: #0f0;
+      height: 200px;
       overflow-y: scroll;
       padding: 10px;
-      margin-top: 20px;
-      border: 1px solid #0f0;
+      border-radius: 5px;
+      font-family: monospace;
     }
   </style>
 </head>
 
-<body>
-  <h1>OXIGEN Vision</h1>
-  <div id="status">Connecting to MQTT...</div>
-  <div id="log"></div>
+<body class="bg-dark text-white">
+
+  <div class="container py-5">
+    <div class="text-center mb-4">
+      <h1 class="text-primary">OXIGEN Vision</h1>
+      <span id="status" class="badge bg-warning text-dark">Connecting to MQTT...</span>
+    </div>
+
+    <div class="row justify-content-center">
+      <div class="col-md-6 text-center">
+        <!-- Canvas tampil otomatis dari p5.js -->
+      </div>
+    </div>
+
+    <div class="row justify-content-center mt-4">
+      <div class="col-md-8">
+        <h5>MQTT Log</h5>
+        <div id="log"></div>
+      </div>
+    </div>
+  </div>
 
   <script>
     // =========================
@@ -75,25 +88,23 @@ Hasil klasifikasi label dikirim secara real-time ke topic MQTT saat label beruba
       });
 
       mqttClient.on("connect", () => {
-        console.log("✅ MQTT Connected");
-        updateStatus("MQTT Connected");
+        updateStatus("MQTT Connected", "success");
         logMessage("MQTT Connected");
         mqttClient.subscribe("oxigen/feedback");
       });
 
       mqttClient.on("reconnect", () => {
-        console.warn("🔄 Reconnecting to MQTT...");
-        updateStatus("Reconnecting to MQTT...");
+        updateStatus("Reconnecting to MQTT...", "warning");
         logMessage("Reconnecting to MQTT...");
       });
 
       mqttClient.on("message", (topic, message) => {
-        logMessage(`📥 MQTT Received [${topic}]: ${message.toString()}`);
+        logMessage(`MQTT Received [${topic}]: ${message.toString()}`);
       });
 
       mqttClient.on("error", (err) => {
-        console.error("❌ MQTT Error:", err);
-        logMessage(`❌ MQTT Error: ${err.message}`);
+        updateStatus("MQTT Error", "danger");
+        logMessage(`MQTT Error: ${err.message}`);
       });
     }
 
@@ -101,19 +112,21 @@ Hasil klasifikasi label dikirim secara real-time ke topic MQTT saat label beruba
       if (mqttClient && mqttClient.connected) {
         mqttClient.publish(mqttTopicLabel, labelValue);
         mqttClient.publish(mqttTopicConfidence, confidenceValue.toString());
-        logMessage(`🚀 Published: ${labelValue} (${confidenceValue.toFixed(2)})`);
+        logMessage(`Published: ${labelValue} (${(confidenceValue * 100).toFixed(2)}%)`);
       }
     }
 
-    function updateStatus(text) {
-      document.getElementById("status").innerText = text;
+    function updateStatus(text, type) {
+      const statusElement = document.getElementById("status");
+      statusElement.innerText = text;
+      statusElement.className = `badge bg-${type} text-${type === 'warning' ? 'dark' : 'white'}`;
     }
 
     function logMessage(message) {
       const logElement = document.getElementById("log");
       const time = new Date().toLocaleTimeString();
       logElement.innerHTML += `[${time}] ${message}<br>`;
-      logElement.scrollTop = logElement.scrollHeight; // Auto scroll
+      logElement.scrollTop = logElement.scrollHeight;
     }
 
     // =========================
@@ -124,7 +137,7 @@ Hasil klasifikasi label dikirim secara real-time ke topic MQTT saat label beruba
     }
 
     function setup() {
-      createCanvas(320, 260);
+      createCanvas(320, 260).parent(document.querySelector('.col-md-6'));
       setupMQTT();
       initializeVideo();
     }
@@ -141,7 +154,7 @@ Hasil klasifikasi label dikirim secara real-time ke topic MQTT saat label beruba
       background(0);
       image(flippedVideo, 0, 0);
 
-      fill(0, 255, 0);
+      fill(13, 110, 253);
       textSize(20);
       textAlign(CENTER);
       text(label, width / 2, height - 10);
@@ -155,8 +168,7 @@ Hasil klasifikasi label dikirim secara real-time ke topic MQTT saat label beruba
 
     function handleResult(error, results) {
       if (error) {
-        console.error("❌ Classification Error:", error);
-        logMessage(`❌ Classification Error: ${error.message}`);
+        logMessage(`Classification Error: ${error.message}`);
         classifyVideo();
         return;
       }
@@ -167,7 +179,6 @@ Hasil klasifikasi label dikirim secara real-time ke topic MQTT saat label beruba
 
         label = currentLabel;
 
-        // Publish ke MQTT hanya jika label atau confidence berubah signifikan
         if (currentLabel !== lastLabel || Math.abs(currentConfidence - lastConfidence) > 0.05) {
           publishLabel(currentLabel, currentConfidence);
           lastLabel = currentLabel;
@@ -178,6 +189,7 @@ Hasil klasifikasi label dikirim secara real-time ke topic MQTT saat label beruba
       classifyVideo();
     }
   </script>
+
 </body>
 
 </html>
